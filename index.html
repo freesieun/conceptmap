@@ -350,6 +350,12 @@ function memo(c){
   if(memoMap.size>400)memoMap.clear();
   memoMap.set(k,m);return m;
 }
+var SUBC={'0':'\u2080','1':'\u2081','2':'\u2082','3':'\u2083','4':'\u2084','5':'\u2085','6':'\u2086','7':'\u2087','8':'\u2088','9':'\u2089','+':'\u208a','-':'\u208b','=':'\u208c','(':'\u208d',')':'\u208e'};
+var SUPC={'0':'\u2070','1':'\u00b9','2':'\u00b2','3':'\u00b3','4':'\u2074','5':'\u2075','6':'\u2076','7':'\u2077','8':'\u2078','9':'\u2079','+':'\u207a','-':'\u207b','=':'\u207c','(':'\u207d',')':'\u207e'};
+function scripts(t){
+  return String(t).replace(/_([0-9+\-=()]+)/g,function(m,g){return g.replace(/./g,function(ch){return SUBC[ch]})})
+                  .replace(/\^([0-9+\-=()]+)/g,function(m,g){return g.replace(/./g,function(ch){return SUPC[ch]})});
+}
 function okId(a){return typeof a==='string'&&/^[A-Za-z0-9_-]{8,64}$/.test(a)}
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}return null}
 
@@ -795,7 +801,7 @@ layer.addEventListener('focusout',function(e){
   var t=e.target;if(!t.classList||!t.classList.contains('title'))return;
   t.contentEditable='false';
   var id=t.parentNode.dataset.id,c=cards.get(id);if(!c)return;
-  var v=t.textContent.replace(/\s+$/,'');
+  var v=scripts(t.textContent.replace(/\s+$/,''));
   commit(id,{title:c.title},{title:v});
   renderCard(id);drawEdges();placeMini();
 });
@@ -1108,6 +1114,7 @@ function syncDetail(force){
 }
 function leaveDetail(){
   var id=openId,c=cards.get(id);if(!id)return;
+  if(c){var tv=scripts(c.title);if(tv!==c.title){c.title=tv;saveSoon(id)}}
   flush(id);
   if(c&&dOrig&&(dOrig.title!==c.title||dOrig.body!==c.body)){
     var b=dOrig,a={title:c.title,body:c.body,fmt:c.fmt};
@@ -1163,6 +1170,11 @@ dBody.addEventListener('keydown',function(e){
 dShow.addEventListener('change',function(){
   var id=openId,c=cards.get(id);if(!c)return;
   commit(id,{show:!!c.show},{show:dShow.checked});
+});
+dTitle.addEventListener('blur',function(){
+  var c=cards.get(openId);if(!c)return;
+  var v=scripts(dTitle.value);
+  if(v!==dTitle.value){dTitle.value=v;c.title=v;saveSoon(openId)}
 });
 dTitle.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();dBody.focus()}});
 $('#d-back').addEventListener('click',closeDetail);
