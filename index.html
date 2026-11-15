@@ -194,6 +194,11 @@ body.zoom-low #z-group{position:fixed;right:16px;bottom:14px}
 .rich ul,.rich ol{margin:.2em 0;padding-left:1.5em}
 .rich h3{font-size:1.15em;margin:.5em 0 .2em;font-weight:600}
 .rich p{margin:0}
+.rich sub,.rich sup{font-size:.72em;line-height:0}
+.fmt sub,.fmt sup{font-size:.7em;line-height:0}
+.card .title{text-align:center}
+.card.note:not(.show-prev){display:flex;flex-direction:column;justify-content:center}
+#detail,#detail input,#detail .rich{text-align:left}
 .rich blockquote{margin:0 0 0 1.2em}
 .fmt{display:flex;flex-wrap:wrap;gap:6px}
 .fmt .plain{padding:4px 10px;font-size:13px}
@@ -285,6 +290,8 @@ body.zoom-low #z-group{position:fixed;right:16px;bottom:14px}
     <div class="fmt" id="d-fmt">
       <button class="plain" type="button" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
       <button class="plain" type="button" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+      <button class="plain" type="button" data-cmd="subscript" title="Subscript (Ctrl+,)">X<sub>2</sub></button>
+      <button class="plain" type="button" data-cmd="superscript" title="Superscript (Ctrl+.)">X<sup>2</sup></button>
       <button class="plain" type="button" data-cmd="heading" title="Heading">Heading</button>
       <button class="plain" type="button" data-cmd="insertUnorderedList" title="Bullet list">• List</button>
       <button class="plain" type="button" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
@@ -315,7 +322,7 @@ var LEG={red:'#d2453c',orange:'#d07a1f',green:'#2a9a66',blue:'#2f7fd6',gray:'#72
 function hexOf(c){if(typeof c!=='string')return '';if(/^#[0-9a-f]{6}$/i.test(c))return c.toLowerCase();return LEG[c]||''}
 function ecHex(c){return hexOf(c)}
 function edgeCopy(e){return {from:String(e.from),to:String(e.to),color:hexOf(e.color)}}
-var OKTAG={B:1,STRONG:1,I:1,EM:1,U:1,UL:1,OL:1,LI:1,P:1,DIV:1,BR:1,H3:1,BLOCKQUOTE:1};
+var OKTAG={SUB:1,SUP:1,B:1,STRONG:1,I:1,EM:1,U:1,UL:1,OL:1,LI:1,P:1,DIV:1,BR:1,H3:1,BLOCKQUOTE:1};
 function sanitize(html){
   var doc=new DOMParser().parseFromString('<body>'+html+'</body>','text/html'),out=document.createElement('div');
   (function walk(src,dst){
@@ -1151,6 +1158,7 @@ $('#d-fmt').addEventListener('mousedown',function(e){if(e.target.closest('button
 $('#d-fmt').addEventListener('click',function(e){var b=e.target.closest('button');if(b)fmt(b.dataset.cmd)});
 dBody.addEventListener('keydown',function(e){
   if(e.key==='Tab'&&inList()){e.preventDefault();document.execCommand(e.shiftKey?'outdent':'indent',false,null);bodyChanged()}
+  else if((e.ctrlKey||e.metaKey)&&(e.key===','||e.key==='.')){e.preventDefault();document.execCommand(e.key===','?'subscript':'superscript',false,null);bodyChanged()}
 });
 dShow.addEventListener('change',function(){
   var id=openId,c=cards.get(id);if(!c)return;
