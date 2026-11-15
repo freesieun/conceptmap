@@ -1266,6 +1266,7 @@ function openMenu(btn,kind,id){
     menuItem('Delete folder',function(){deleteFolder(id)},'danger');
   }else{
     menuItem('Rename',function(){renaming={kind:kind,id:id};renderTree()});
+    menuItem('Duplicate',function(){duplicateMap(id)});
     var targets=sorted(folders).filter(function(f){return f[0]!==item.folder});
     if(targets.length||item.folder)menu.appendChild(document.createElement('hr'));
     targets.forEach(function(f){menuItem('Move to: '+f[1].name,function(){item.folder=f[0];writeMeta('map',id,item);renderTree();updateCrumb()})});
@@ -1463,6 +1464,37 @@ async function importFile(file){
     idxCache={};
     toast('Restore finished: '+jobs.length+' items written');
   }catch(e){toast('The restore stopped partway. Run it again to finish.')}
+}
+async function duplicateMap(id){
+  var b=boards.get(id);if(!b)return;
+  if(!db){toast('Not connected');return}
+  if(id===board)Object.keys(timers).forEach(flush);
+  toast('Duplicating map…',null,0);
+  try{
+    var nid=newId('b'),src=colPath(id,'cards'),cs=await db.collection(src).get(),es=await db.collection(colPath(id,'edges')).get(),imgMap={},jobs=[];
+    var copyImg=async function(a){
+      if(a in imgMap)return imgMap[a];
+      var sn=await db.doc('images/'+a).get(),dv=sn.exists&&sn.data()?sn.data().d:null;
+      if(typeof dv!=='string'){imgMap[a]='';return ''}
+      var n=newId('i');await db.doc('images/'+n).set({d:dv});imgMap[a]=n;return n;
+    };
+    for(var i=0;i<cs.docs.length;i++){
+      var d=cs.docs[i],c=clean('cards',normCard(d.data()));
+      if(c.asset){c.asset=await copyImg(c.asset);if(!c.asset)delete c.asset}
+      if(c.images){
+        var arr=[];
+        for(var j=0;j<c.images.length;j++){var n2=await copyImg(c.images[j]);if(n2)arr.push(n2)}
+        if(arr.length)c.images=arr;else delete c.images;
+      }
+      (function(cid,body){jobs.push(function(){return db.doc(colPath(nid,'cards')+'/'+cid).set(body)})})(d.id,c);
+    }
+    es.docs.forEach(function(e){var body=clean('edges',e.data()||{});jobs.push(function(){return db.doc(colPath(nid,'edges')+'/'+e.id).set(body)})});
+    await inChunks(jobs,15);
+    var nb={name:(b.name+' copy').slice(0,80),folder:b.folder||'',order:Date.now()};
+    boards.set(nid,nb);writeMeta('map',nid,nb);
+    toast('Map duplicated: '+cs.docs.length+' cards copied');
+    setBoard(nid);
+  }catch(e){toast('Could not finish duplicating the map. Try again.')}
 }
 $('#s-bak').addEventListener('click',function(e){
   e.stopPropagation();closeMenu();
