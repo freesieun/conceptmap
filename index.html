@@ -1348,7 +1348,7 @@ function startData(){
     boardsLoaded=true;pickBoard();renderTree();updateCrumb();renderAll();refreshStatus();
   },fail);
 }
-var CONFIG={apiKey:"AIzaSyAW0j5jkHs0cA2zLxrwDRuck1XCiWPFKng",authDomain:"concept-map-1d01c.firebaseapp.com",projectId:"concept-map-1d01c",storageBucket:"concept-map-1d01c.firebasestorage.app",messagingSenderId:"475868396814",appId:"1:475868396814:web:c7790487902b760dd9ab5f"};
+var CONFIG={apiKey:"AIzaSyAW0j5jkHs0cA2zLxrwDRuck1XCiWPFKng",authDomain:"concept-map-1d01c.web.app",projectId:"concept-map-1d01c",storageBucket:"concept-map-1d01c.firebasestorage.app",messagingSenderId:"475868396814",appId:"1:475868396814:web:c7790487902b760dd9ab5f"};
 var gate=$('#gate'),gateT=$('#gate-t'),gateB=$('#gate-b');
 if(!window.firebase||!CONFIG){
   gateT.textContent=!window.firebase?'Could not load Firebase. Check your connection and reload.':'This site is not connected to Firebase yet.';
