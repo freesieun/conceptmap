@@ -55,7 +55,14 @@ body.side-open #side{display:flex}
 .side-foot{display:flex;gap:6px;padding:10px 12px 14px;border-top:1px solid var(--grid)}
 .side-foot{flex-wrap:wrap}
 .side-foot button{flex:1}
-.side-foot #b-mode,.side-foot #s-out,.side-foot #s-who{flex-basis:100%}
+.side-foot button{flex:1 1 40%}
+.side-foot #s-out,.side-foot #s-who{flex-basis:100%}
+.side-search{padding:0 12px 8px}
+.side-search input{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1.5px solid var(--ink);border-radius:8px;padding:6px 10px}
+.hit{display:block;width:100%;text-align:left;background:transparent;border:0;border-radius:6px;padding:6px 8px}
+.hit:hover{background:color-mix(in srgb,var(--ink) 7%,transparent)}
+.hit b{display:block;font-weight:600;color:var(--violet);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hit span{display:block;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .side-foot #s-who{padding:0;overflow:hidden;text-overflow:ellipsis}
 #gate{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:var(--paper);z-index:70;padding:16px}
 #gate.on{display:flex}
@@ -214,11 +221,13 @@ body.zoom-low #z-group{position:fixed;right:16px;bottom:14px}
 <body>
 <aside id="side">
   <div class="side-head"><b>Thought Map</b><button class="icon" id="s-close" type="button" aria-label="Hide sidebar">‹</button></div>
+  <div class="side-search"><input id="q" type="search" placeholder="Search all maps" autocomplete="off" aria-label="Search all maps"></div>
   <div id="tree"></div>
   <div class="side-foot">
     <button class="plain" id="s-folder" type="button">+ Folder</button>
     <button class="plain" id="s-map" type="button">+ Map</button>
     <button class="plain" id="b-mode" type="button">Dark mode</button>
+    <button class="plain" id="s-bak" type="button">Backup</button>
     <button class="plain" id="s-out" type="button">Sign out</button>
     <div class="side-note" id="s-who"></div>
   </div>
@@ -254,6 +263,7 @@ body.zoom-low #z-group{position:fixed;right:16px;bottom:14px}
   </div>
   </div>
 </div>
+<input id="imp-file" type="file" accept=".json,application/json" hidden>
 <input id="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" hidden>
 
 <div id="empty"><div><b id="empty-h"></b><span id="empty-t"></span></div></div>
@@ -362,8 +372,8 @@ function toast(text,undoFn,ms){
 function hideToast(){toastEl.classList.remove('on');toastUndo=null}
 toastB.addEventListener('click',function(){var u=toastUndo;hideToast();if(u)u()});
 var askEl=$('#ask'),askDone=null;
-function ask(text){
-  $('#ask-t').textContent=text;askEl.classList.add('on');$('#ask-no').focus();
+function ask(text,label){
+  $('#ask-t').textContent=text;$('#ask-yes').textContent=label||'Delete';askEl.classList.add('on');$('#ask-no').focus();
   return new Promise(function(res){askDone=function(v){askEl.classList.remove('on');askDone=null;res(v)}});
 }
 $('#ask-no').addEventListener('click',function(){if(askDone)askDone(false)});
@@ -1151,7 +1161,7 @@ $('#d-file').addEventListener('change',function(e){var f=e.target.files&&e.targe
 window.addEventListener('pagehide',function(){Object.keys(timers).forEach(flush)});
 
 /* ---------- folders and maps ---------- */
-var tree=$('#tree'),menu=$('#menu'),shut={},renaming=null,boardsLoaded=false,foldersLoaded=false;
+var tree=$('#tree'),menu=$('#menu'),shut={},renaming=null,boardsLoaded=false,foldersLoaded=false,searching=false;
 function normName(v,fallback){return typeof v==='string'&&v.trim()?v.trim().slice(0,80):fallback}
 function sorted(map){return Array.from(map.entries()).sort(function(a,b){return (a[1].order-b[1].order)||(a[1].name<b[1].name?-1:1)})}
 function updateCrumb(){
@@ -1192,6 +1202,7 @@ function rowEl(kind,id,item,loose){
   return row;
 }
 function renderTree(){
+  if(searching)return;
   if(renaming&&document.activeElement&&document.activeElement.id==='rename-input')return;
   tree.textContent='';
   var bs=sorted(boards),fs=sorted(folders);
@@ -1308,6 +1319,7 @@ function setBoard(id){
     if(!snap.metadata||!snap.metadata.fromCache){clearTimeout(slow);if(statusEl.dataset.s==='error'&&!Object.keys(queue).length)statusEl.dataset.s='saved'}
     applySnap('cards',snap);
     if(first&&cards.size){first=false;if(!hadView)fit()}
+    if(pendingFocus&&cards.has(pendingFocus)){var pf=pendingFocus;pendingFocus=null;centerOn(pf)}
   },fail));
   unsubs.push(db.collection(colPath(b,'edges')).onSnapshot(function(snap){if(b===board)applySnap('edges',snap)},fail));
   unsubs.push(function(){clearTimeout(slow)});
@@ -1320,6 +1332,129 @@ $('#b-side').addEventListener('click',function(){toggleSide()});
 $('#s-close').addEventListener('click',function(){toggleSide(false)});
 $('#s-folder').addEventListener('click',newFolder);
 $('#s-map').addEventListener('click',function(){var b=board&&boards.get(board);newMap(b&&folders.has(b.folder)?b.folder:'')});
+
+/* ---------- search ---------- */
+var qEl=$('#q'),idxCache={},pendingFocus=null,qToken=0,qTimer=null;
+function centerOn(id){
+  var c=cards.get(id),b=box(id);if(!c||!b)return;
+  var r=vp.getBoundingClientRect();
+  view.x=r.width/2-(b.x+b.w/2)*view.z;view.y=r.height/2-(b.y+b.h/2)*view.z;applyView();
+  select({type:'card',id:id});
+}
+async function boardItems(b){
+  if(b===board){var live=[];cards.forEach(function(c,id){live.push({b:b,id:id,t:c.title,x:memo(c).text,k:c.kind})});return live}
+  var hit=idxCache[b];
+  if(hit&&Date.now()-hit.at<120000)return hit.items;
+  if(!db)return [];
+  var snap=await db.collection(colPath(b,'cards')).get(),items=[];
+  snap.docs.forEach(function(d){var c=normCard(d.data());items.push({b:b,id:d.id,t:c.title,x:memo(c).text,k:c.kind})});
+  idxCache[b]={at:Date.now(),items:items};return items;
+}
+function note(text){tree.textContent='';var n=document.createElement('div');n.className='side-note';n.textContent=text;tree.appendChild(n)}
+async function runSearch(){
+  var q=qEl.value.trim().toLowerCase(),token=++qToken;
+  if(!q){searching=false;renderTree();return}
+  searching=true;note('Searching…');
+  var all=[];
+  try{
+    var ids=Array.from(boards.keys());
+    for(var i=0;i<ids.length;i++){all=all.concat(await boardItems(ids[i]));if(token!==qToken)return}
+  }catch(e){note('Could not search. Check your connection.');return}
+  var hits=all.filter(function(it){return (it.t||'').toLowerCase().indexOf(q)>=0||(it.x||'').toLowerCase().indexOf(q)>=0});
+  if(!hits.length){note('No cards match.');return}
+  tree.textContent='';
+  hits.slice(0,80).forEach(function(it){
+    var bt=document.createElement('button');bt.type='button';bt.className='hit';
+    var t=document.createElement('b');t.textContent=it.t||(it.k==='image'?'Image':'Untitled');
+    var s2=document.createElement('span'),bd=boards.get(it.b),where=bd?bd.name:'',i2=(it.x||'').toLowerCase().indexOf(q);
+    s2.textContent=where+(i2>=0?' · '+(i2>20?'…':'')+it.x.slice(Math.max(0,i2-20),i2+70).replace(/\s+/g,' '):'');
+    bt.appendChild(t);bt.appendChild(s2);
+    bt.addEventListener('click',function(){
+      if(it.b===board){if(openId)closeDetail();centerOn(it.id)}else{pendingFocus=it.id;setBoard(it.b)}
+      if(window.innerWidth<=700)toggleSide(false);
+    });
+    tree.appendChild(bt);
+  });
+  if(hits.length>80)tree.appendChild(Object.assign(document.createElement('div'),{className:'side-note',textContent:'Showing the first 80 of '+hits.length+' matches.'}));
+}
+qEl.addEventListener('input',function(){clearTimeout(qTimer);qTimer=setTimeout(runSearch,250)});
+qEl.addEventListener('keydown',function(e){if(e.key==='Escape'){e.stopPropagation();qEl.value='';runSearch();qEl.blur()}});
+
+/* ---------- backup ---------- */
+var OKID=/^[A-Za-z0-9_-]{1,64}$/;
+async function exportAll(){
+  if(!db){toast('Not connected, so there is nothing to back up');return}
+  Object.keys(timers).forEach(flush);
+  toast('Preparing backup…',null,0);
+  try{
+    var out={app:'thought-map',version:1,exported:new Date().toISOString(),folders:{},boards:{},palette:pal||[],images:{}},imgs={},nCards=0;
+    folders.forEach(function(f,id){out.folders[id]={name:f.name,order:f.order}});
+    var ids=Array.from(boards.keys());
+    for(var i=0;i<ids.length;i++){
+      var id=ids[i],b=boards.get(id),co={},eo={};
+      var cs=await db.collection(colPath(id,'cards')).get(),es=await db.collection(colPath(id,'edges')).get();
+      cs.docs.forEach(function(d){var c=clean('cards',normCard(d.data()));co[d.id]=c;nCards++;if(c.asset)imgs[c.asset]=1;(c.images||[]).forEach(function(a){imgs[a]=1})});
+      es.docs.forEach(function(d){eo[d.id]=clean('edges',d.data()||{})});
+      out.boards[id]={name:b.name,folder:b.folder||'',order:b.order,cards:co,edges:eo};
+    }
+    var keys=Object.keys(imgs);
+    for(var j=0;j<keys.length;j++){
+      var sn=await db.doc('images/'+keys[j]).get(),dv=sn.exists&&sn.data()?sn.data().d:null;
+      if(typeof dv==='string')out.images[keys[j]]=dv;
+    }
+    var url=URL.createObjectURL(new Blob([JSON.stringify(out)],{type:'application/json'})),a=document.createElement('a');
+    a.href=url;a.download='thought-map-backup-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},15000);
+    toast('Backup file made: '+ids.length+' maps, '+nCards+' cards, '+Object.keys(out.images).length+' images');
+  }catch(e){toast('Could not make the backup. Try again.')}
+}
+async function inChunks(jobs,size){
+  for(var i=0;i<jobs.length;i+=size)await Promise.all(jobs.slice(i,i+size).map(function(j){return j()}));
+}
+async function importFile(file){
+  if(!db){toast('Not connected');return}
+  var data;
+  try{data=JSON.parse(await file.text())}catch(e){toast('That file is not a Thought Map backup');return}
+  if(!data||data.app!=='thought-map'||typeof data.boards!=='object'){toast('That file is not a Thought Map backup');return}
+  var bids=Object.keys(data.boards||{}).filter(function(k){return OKID.test(k)});
+  var ok=await ask('Restore '+bids.length+' maps from this backup? Maps and cards with the same ID are overwritten with the backup copy. Nothing else is deleted.','Restore');
+  if(!ok)return;
+  toast('Restoring…',null,0);
+  try{
+    var jobs=[];
+    Object.keys(data.folders||{}).forEach(function(k){
+      if(!OKID.test(k))return;var f=data.folders[k]||{};
+      jobs.push(function(){return db.doc('folders/'+k).set({name:normName(f.name,'Folder'),order:+f.order||0})});
+    });
+    bids.forEach(function(k){
+      var b=data.boards[k]||{};
+      jobs.push(function(){return db.doc('boards/'+k).set({name:normName(b.name,'Map'),folder:typeof b.folder==='string'&&OKID.test(b.folder)?b.folder:'',order:+b.order||0})});
+      Object.keys(b.cards||{}).forEach(function(c){if(OKID.test(c))jobs.push(function(){return db.doc(colPath(k,'cards')+'/'+c).set(clean('cards',normCard(b.cards[c])))})});
+      Object.keys(b.edges||{}).forEach(function(e){
+        var ed=b.edges[e]||{};
+        if(OKID.test(e)&&OKID.test(String(ed.from))&&OKID.test(String(ed.to)))jobs.push(function(){return db.doc(colPath(k,'edges')+'/'+e).set(clean('edges',ed))});
+      });
+    });
+    Object.keys(data.images||{}).forEach(function(k){
+      var dv=data.images[k];
+      if(okId(k)&&typeof dv==='string'&&dv.length<1000000&&/^data:image\/(png|jpeg|gif|webp|svg\+xml)[;,]/.test(dv))jobs.push(function(){return db.doc('images/'+k).set({d:dv})});
+    });
+    if(Array.isArray(data.palette)){var pl=data.palette.map(hexOf).filter(Boolean).slice(0,12);if(pl.length)jobs.push(function(){return db.doc('meta/palette').set({colors:pl})})}
+    await inChunks(jobs,15);
+    idxCache={};
+    toast('Restore finished: '+jobs.length+' items written');
+  }catch(e){toast('The restore stopped partway. Run it again to finish.')}
+}
+$('#s-bak').addEventListener('click',function(e){
+  e.stopPropagation();closeMenu();
+  menuItem('Download a backup file',exportAll);
+  menuItem('Restore from a backup file',function(){$('#imp-file').click()});
+  menu.classList.add('on');
+  var r=e.currentTarget.getBoundingClientRect(),mh=menu.offsetHeight,mw=menu.offsetWidth;
+  menu.style.left=Math.max(8,Math.min(r.left,window.innerWidth-mw-8))+'px';
+  menu.style.top=Math.max(8,r.top-mh-4)+'px';
+});
+$('#imp-file').addEventListener('change',function(e){var f=e.target.files&&e.target.files[0];e.target.value='';if(f)importFile(f)});
 
 /* ---------- start ---------- */
 (function(){var s=ls('map-side');if(s==='1'||(s===null&&window.innerWidth>700))document.body.classList.add('side-open')})();
