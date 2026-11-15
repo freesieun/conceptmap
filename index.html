@@ -589,6 +589,22 @@ function recolor(ids,hex){
   ids.forEach(function(i){var k=cards.get(i);if(k){b[i]={color:k.color||''};a[i]={color:hex}}});
   applyMap(a);act(function(){applyMap(b)},function(){applyMap(a)});renderAll();buildMini();
 }
+function dupCards(ids){
+  if(!board)return;
+  var map={},newCards=[],newEdges=[];
+  ids.forEach(function(i){
+    var c=cards.get(i);if(!c)return;
+    var n=Object.assign({},c,{x:c.x+28,y:c.y+28,images:(c.images||[]).slice()}),nid=newId('c');
+    map[i]=nid;newCards.push([nid,n]);
+  });
+  if(!newCards.length)return;
+  edges.forEach(function(e){if(map[e.from]&&map[e.to])newEdges.push([newId('e'),{from:map[e.from],to:map[e.to],color:e.color||''}])});
+  function doIt(){newCards.forEach(function(c){putCard(c[0],c[1])});newEdges.forEach(function(e){putEdge(e[0],e[1])})}
+  function undoIt(){newEdges.forEach(function(e){putEdge(e[0],null)});newCards.forEach(function(c){putCard(c[0],null)})}
+  doIt();act(undoIt,doIt);renderAll();
+  var nids=newCards.map(function(c){return c[0]});
+  select(nids.length===1?{type:'card',id:nids[0]}:{type:'cards',ids:nids});
+}
 function deleteCards(ids){
   var items=[],gone={};
   ids.forEach(function(i){var c=cards.get(i);if(!c)return;flush(i);items.push([i,Object.assign({},c)])});
@@ -685,6 +701,7 @@ function buildMini(){
     var first=cards.get(ids[0]),common=first?first.color||'':'';
     ids.forEach(function(i){var k=cards.get(i);if(!k||(k.color||'')!==common)common=null});
     mini.appendChild(colorDots(common,function(hex){recolor(ids,hex)}));
+    mini.appendChild(miniBtn('Duplicate',function(){dupCards(ids)}));
     mini.appendChild(miniBtn('Delete',function(){deleteCards(ids)}));
     mini.classList.add('on');placeMini();return;
   }
@@ -692,6 +709,7 @@ function buildMini(){
     var id=sel.id,c=cards.get(id);if(!c){mini.classList.remove('on');return}
     mini.appendChild(miniBtn('Open',function(){openDetail(id)}));
     mini.appendChild(colorDots(c.color||'',function(hex){var cur=cards.get(id);if(!cur)return;commit(id,{color:cur.color||''},{color:hex});renderAll();buildMini()}));
+    mini.appendChild(miniBtn('Duplicate',function(){dupCards([id])}));
     mini.appendChild(miniBtn('Delete',function(){deleteCard(id)}));
   }else{
     var eid=sel.id;
@@ -1013,6 +1031,7 @@ document.addEventListener('keydown',function(e){
   var mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
   if(mod&&k==='z'){e.preventDefault();if(e.shiftKey)redo();else undo();return}
   if(mod&&k==='y'){e.preventDefault();redo();return}
+  if(mod&&k==='d'){e.preventDefault();if(sel&&sel.type==='card')dupCards([sel.id]);else if(sel&&sel.type==='cards')dupCards(sel.ids.slice());return}
   if(!sel||mod)return;
   if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();if(sel.type==='cards')deleteCards(sel.ids.slice());else if(sel.type==='card')deleteCard(sel.id);else deleteEdge(sel.id)}
   else if(sel.type==='card'&&e.key==='Enter'){e.preventDefault();openDetail(sel.id)}
