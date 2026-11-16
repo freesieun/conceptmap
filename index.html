@@ -139,6 +139,8 @@ body.side-open #side{display:flex}
 .group{display:flex;align-items:center;gap:2px;background:var(--card);border:1.5px solid var(--ink);border-radius:8px;padding:3px}
 .group button{background:transparent;border:0;padding:6px 11px;border-radius:5px;font-size:14px}
 .group button:hover{background:var(--violet-soft)}
+.group button.on{background:var(--violet);color:var(--card)}
+#vp.picking{cursor:crosshair}
 #crumb{min-width:36px;flex-shrink:1;padding:6px 10px;font-weight:600;border-right:1px solid var(--grid);margin-right:2px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #crumb i{font-style:normal;font-weight:400;color:var(--muted)}
 #zoom{min-width:52px;text-align:center;font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
@@ -253,6 +255,7 @@ body.zoom-low #z-group{position:fixed;right:16px;bottom:14px}
     <span id="crumb"></span>
     <button id="b-card" type="button">+ Card</button>
     <button id="b-img" type="button">+ Image</button>
+    <button id="b-sel" type="button" aria-pressed="false" title="Drag a box to select several cards (or hold Shift and drag)">Select</button>
   </div>
   <div class="group" id="z-group">
     <button id="b-out" type="button" aria-label="Zoom out">−</button>
@@ -890,6 +893,8 @@ $('#b-img').addEventListener('click',function(){$('#file').click()});
 $('#file').addEventListener('change',function(e){var f=e.target.files&&e.target.files[0];if(f)addImage(f,viewCenter());e.target.value=''});
 
 /* ---------- pointer handling ---------- */
+var selMode=false;
+function setSelMode(on){selMode=!!on;var b=$('#b-sel');b.classList.toggle('on',selMode);b.setAttribute('aria-pressed',selMode?'true':'false');vp.classList.toggle('picking',selMode)}
 var selAt=0,lastTap={key:'',t:0,x:0,y:0},drag=null,pointers=new Map(),pinch=null,lastBg={t:0,x:0,y:0},noDbl=0,marq=$('#marq');
 function typing(){var a=document.activeElement;return a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable)}
 vp.addEventListener('pointerdown',function(e){
@@ -920,7 +925,7 @@ vp.addEventListener('pointerdown',function(e){
   }else{
     var twice=Date.now()-lastBg.t<600&&Math.hypot(sx-lastBg.x,sy-lastBg.y)<16;
     lastBg.t=0;
-    if((twice||e.shiftKey)&&board)drag={kind:'marq',sx:sx,sy:sy,moved:false};
+    if((twice||e.shiftKey||selMode)&&board)drag={kind:'marq',sx:sx,sy:sy,moved:false};
     else{drag={kind:'pan',sx:sx,sy:sy,x:view.x,y:view.y};vp.classList.add('panning')}
     if(sel){try{select(null)}catch(err){sel=null}}
   }
@@ -993,7 +998,7 @@ function endPointer(e){
   if(d.kind==='marq'){
     marq.style.display='none';
     if(!d.moved||e.type==='pointercancel')return;
-    noDbl=Date.now();
+    noDbl=Date.now();setSelMode(false);
     var p1=toWorld(d.sx,d.sy),p2=toWorld(e.clientX,e.clientY),x1=Math.min(p1.x,p2.x),x2=Math.max(p1.x,p2.x),y1=Math.min(p1.y,p2.y),y2=Math.max(p1.y,p2.y),hitIds=[];
     cards.forEach(function(k,i){var bx=box(i);if(bx&&bx.x<x2&&bx.x+bx.w>x1&&bx.y<y2&&bx.y+bx.h>y1)hitIds.push(i)});
     select(!hitIds.length?null:hitIds.length===1?{type:'card',id:hitIds[0]}:{type:'cards',ids:hitIds});
@@ -1039,7 +1044,7 @@ vp.addEventListener('wheel',function(e){
 },{passive:false});
 document.addEventListener('keydown',function(e){
   if(askDone){if(e.key==='Escape')askDone(false);return}
-  if(e.key==='Escape'){closeMenu();if(openId){closeDetail();return}if(sel&&!typing())select(null);return}
+  if(e.key==='Escape'){closeMenu();if(selMode)setSelMode(false);if(openId){closeDetail();return}if(sel&&!typing())select(null);return}
   if(typing()||openId)return;
   var mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
   if(mod&&k==='z'){e.preventDefault();if(e.shiftKey)redo();else undo();return}
@@ -1051,6 +1056,7 @@ document.addEventListener('keydown',function(e){
   else if(sel.type==='card'&&e.key==='F2'){e.preventDefault();editTitle(sel.id)}
 });
 $('#b-card').addEventListener('click',function(){var id=addCard(viewCenter());if(id){select({type:'card',id:id});editTitle(id)}else toast('Open a map first')});
+$('#b-sel').addEventListener('click',function(){setSelMode(!selMode)});
 $('#b-undo').addEventListener('click',undo);
 $('#b-redo').addEventListener('click',redo);
 $('#b-in').addEventListener('click',function(){centerZoom(1.2)});
