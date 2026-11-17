@@ -848,10 +848,10 @@ async function shrink(file){
 var IMG=/^image\/(png|jpeg|gif|webp|svg\+xml)$/;
 function measure(file){
   return new Promise(function(res){
-    var u;try{u=URL.createObjectURL(file)}catch(e){res(1.5);return}
+    var u;try{u=URL.createObjectURL(file)}catch(e){res({w:0,ratio:1.5});return}
     var im=new Image();
-    im.onload=function(){URL.revokeObjectURL(u);res(im.naturalWidth&&im.naturalHeight?im.naturalWidth/im.naturalHeight:1.5)};
-    im.onerror=function(){URL.revokeObjectURL(u);res(1.5)};
+    im.onload=function(){URL.revokeObjectURL(u);res({w:im.naturalWidth||0,ratio:im.naturalWidth&&im.naturalHeight?im.naturalWidth/im.naturalHeight:1.5})};
+    im.onerror=function(){URL.revokeObjectURL(u);res({w:0,ratio:1.5})};
     im.src=u;
   });
 }
@@ -862,11 +862,11 @@ async function addImage(file,pos){
   var b=board;
   toast('Uploading image…',null,0);
   try{
-    var ratio=await measure(file);
+    var m=await measure(file),ratio=m.ratio;
     var r=await assets.upload(file,{type:file.type});
     hideToast();
     if(b!==board){assets.delete(r.id).catch(function(){});return}
-    var w=260,id=addCard({x:pos.x+100-w/2,y:pos.y+24-(w/ratio)/2},{kind:'image',asset:r.id,ratio:Math.round(ratio*1000)/1000,w:w});
+    var w=file.type==='image/svg+xml'?260:Math.round(Math.min(420,Math.max(120,m.w||260))),id=addCard({x:pos.x+100-w/2,y:pos.y+24-(w/ratio)/2},{kind:'image',asset:r.id,ratio:Math.round(ratio*1000)/1000,w:w});
     if(id)select({type:'card',id:id});
   }catch(e){
     var code=e&&e.code;
