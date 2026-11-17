@@ -873,11 +873,25 @@ async function addImage(file,pos){
     toast(code==='too_large'?'This image is too large to store, even after shrinking':code==='quota_or_state'?'Image storage is full':code==='unsupported_type'?'This file type cannot be added':'Could not upload the image. Try again.');
   }
 }
+function clipImage(cd){
+  if(!cd)return null;
+  var fs=cd.files,i;
+  for(i=0;fs&&i<fs.length;i++)if(fs[i]&&fs[i].type.indexOf('image/')===0)return fs[i];
+  var it=cd.items;
+  for(i=0;it&&i<it.length;i++){
+    if(it[i].kind!=='file'||String(it[i].type).indexOf('image/')!==0)continue;
+    var f=it[i].getAsFile();if(f)return f;
+  }
+  return null;
+}
 document.addEventListener('paste',function(e){
   if(!openId&&typing())return;
-  var items=e.clipboardData&&e.clipboardData.files,f=null;
-  for(var i=0;items&&i<items.length;i++)if(items[i].type.indexOf('image/')===0){f=items[i];break}
-  if(!f)return;
+  var f=clipImage(e.clipboardData);
+  if(!f){
+    if(!openId&&!typing()&&e.clipboardData&&e.clipboardData.types&&e.clipboardData.types.length)
+      toast('No image in the clipboard. From ChemDraw, copy the structure as a picture (or take a screenshot) and paste that.');
+    return;
+  }
   e.preventDefault();if(openId)addDetailImage(f);else addImage(f,viewCenter());
 });
 vp.addEventListener('dragover',function(e){e.preventDefault()});
@@ -1147,7 +1161,7 @@ try{document.execCommand('styleWithCSS',false,false)}catch(e){}
 dBody.addEventListener('input',bodyChanged);
 dBody.addEventListener('paste',function(e){
   var cd=e.clipboardData;if(!cd)return;
-  for(var i=0;i<cd.files.length;i++)if(cd.files[i].type.indexOf('image/')===0)return;
+  if(clipImage(cd))return;
   var txt=cd.getData('text/plain');e.preventDefault();
   if(txt)document.execCommand('insertText',false,txt);
 });
