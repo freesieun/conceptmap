@@ -689,6 +689,13 @@ function anchor(b,tx,ty,pad){
 function edgeGeom(e){
   var a=box(e.from),b=box(e.to);if(!a||!b)return null;
   var p=anchor(a,b.x+b.w/2,b.y+b.h/2,3),q=anchor(b,a.x+a.w/2,a.y+a.h/2,5);
+  var key=function(x){return x.from<x.to?x.from+'|'+x.to:x.to+'|'+x.from},k=key(e),grp=[];
+  edges.forEach(function(x,i){if(key(x)===k)grp.push(i)});
+  if(grp.length>1){
+    var id=null;edges.forEach(function(x,i){if(x===e)id=i});
+    var idx=grp.sort().indexOf(id),dx=q.x-p.x,dy=q.y-p.y,L=Math.hypot(dx,dy)||1,sg=e.from<e.to?1:-1,off=(idx-(grp.length-1)/2)*36*sg,ox=-dy/L*off,oy=dx/L*off;
+    p={x:p.x+ox,y:p.y+oy};q={x:q.x+ox,y:q.y+oy};
+  }
   return {p:p,q:q};
 }
 function headPath(p,q){
