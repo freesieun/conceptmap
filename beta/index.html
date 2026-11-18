@@ -724,7 +724,7 @@ function editEdgeLabel(eid){
   closeLabelEdit(true);
   var r=vp.getBoundingClientRect(),mx=(g.p.x+g.q.x)/2,my=(g.p.y+g.q.y)/2;
   var inp=document.createElement('input');inp.type='text';inp.className='lbl-in';inp.maxLength=60;inp.value=e.label||'';
-  inp.setAttribute('aria-label','Arrow label');inp.placeholder='Reagent, e.g. OsO\u2084';
+  inp.setAttribute('aria-label','Arrow label');inp.placeholder='Add label';
   inp.style.left=(r.left+view.x+mx*view.z)+'px';inp.style.top=(r.top+view.y+my*view.z)+'px';
   document.body.appendChild(inp);
   var done=false,rec={el:inp,id:eid};
