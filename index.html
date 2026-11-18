@@ -324,6 +324,12 @@ var queue={},timers={},DEL={};
 var LEG={red:'#d2453c',orange:'#d07a1f',green:'#2a9a66',blue:'#2f7fd6',gray:'#727785',violet:'#7447d1'};
 function hexOf(c){if(typeof c!=='string')return '';if(/^#[0-9a-f]{6}$/i.test(c))return c.toLowerCase();return LEG[c]||''}
 function ecHex(c){return hexOf(c)}
+var SUBD='₀₁₂₃₄₅₆₇₈₉';
+function chemFmt(t,final){
+  t=t.replace(/([A-Za-z\)])(\d+)/g,function(m,a,d){return a+d.replace(/\d/g,function(x){return SUBD[+x]})});
+  if(final)t=t.replace(/([A-Za-z\u2080-\u2089])([+\-])(?=$|[\s,;)])/g,function(m,a,c){return a+(c==='+'?'⁺':'⁻')});
+  return t;
+}
 function cleanLabel(t){return typeof t==='string'?t.replace(/\s+/g,' ').trim().slice(0,60):''}
 function edgeCopy(e){return {from:String(e.from),to:String(e.to),color:hexOf(e.color),label:cleanLabel(e.label)}}
 var OKTAG={SUB:1,SUP:1,B:1,STRONG:1,I:1,EM:1,U:1,UL:1,OL:1,LI:1,P:1,DIV:1,BR:1,H3:1,BLOCKQUOTE:1};
@@ -721,7 +727,7 @@ function drawEdges(){
 var labelInp=null;
 function setEdgeLabel(eid,text){
   var e=edges.get(eid);if(!e)return;
-  var t=cleanLabel(text);if((e.label||'')===t)return;
+  var t=cleanLabel(chemFmt(typeof text==='string'?text:'',true));if((e.label||'')===t)return;
   var a=edgeCopy(e),n=edgeCopy(e);n.label=t;
   putEdge(eid,n);act(function(){putEdge(eid,a)},function(){putEdge(eid,n)});drawEdges();buildMini();
 }
@@ -743,6 +749,7 @@ function editEdgeLabel(eid){
   };
   labelInp=rec;
   inp.addEventListener('keydown',function(ev){ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();rec.finish(true)}else if(ev.key==='Escape'){ev.preventDefault();rec.finish(false)}});
+  inp.addEventListener('input',function(){var pos=inp.selectionStart,v=chemFmt(inp.value,false);if(v!==inp.value){inp.value=v;try{inp.setSelectionRange(pos,pos)}catch(_){}}});
   inp.addEventListener('blur',function(){rec.finish(true)});
   drawEdges();inp.focus();inp.select();
 }
